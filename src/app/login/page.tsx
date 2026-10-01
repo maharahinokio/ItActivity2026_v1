@@ -33,6 +33,23 @@ export default function LoginPage() {
       return;
     }
 
+    // บัญชีที่ถูกปิดใช้งาน: ห้ามเข้าแม้รหัสผ่านถูก (GoTrue ไม่รู้จัก profiles.is_active)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user?.id ?? "")
+      .single();
+
+    if (!profile?.is_active) {
+      await supabase.auth.signOut();
+      setError("บัญชีนี้ถูกปิดใช้งานแล้ว กรุณาติดต่อผู้ดูแลระบบ");
+      setLoading(false);
+      return;
+    }
+
     router.replace("/");
     router.refresh();
   }

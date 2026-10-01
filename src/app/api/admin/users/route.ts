@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /** POST /api/admin/users — แอดมินสร้างบัญชีเจ้าหน้าที่ใหม่ */
 export async function POST(request: Request) {
   const caller = await getProfile();
-  if (!caller || caller.role !== "admin") {
+  if (!caller || caller.role !== "admin" || !caller.is_active) {
     return NextResponse.json({ error: "ไม่มีสิทธิ์เข้าถึง" }, { status: 403 });
   }
 

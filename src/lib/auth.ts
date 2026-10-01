@@ -24,6 +24,12 @@ export async function requireSession(): Promise<Session> {
 
   if (!profile) redirect("/login");
 
+  // บัญชีที่ถูกปิดใช้งาน: เพิกถอน session แล้วเด้งออก (ชั้นเสริมนอกเหนือจาก GoTrue ban)
+  if (!(profile as Profile).is_active) {
+    await supabase.auth.signOut();
+    redirect("/login");
+  }
+
   return { userId: user.id, profile: profile as Profile };
 }
 

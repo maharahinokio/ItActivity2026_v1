@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // ไฟล์ของ security-audit skill (ไม่ใช่โค้ดของแอป)
+    ".agents/**",
+    "agent/**",
+    ".zcode/**",
   ]),
 ]);
 

@@ -25,7 +25,7 @@ create table if not exists public.categories (
 -- 3) ตาราง activities (บันทึกกิจกรรม)
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles (id) on delete cascade,
+  user_id uuid not null default auth.uid() references public.profiles (id) on delete cascade,
   activity_date date not null,
   start_time time not null,
   end_time time not null,
@@ -38,6 +38,9 @@ create table if not exists public.activities (
 
 create index if not exists activities_user_date_idx on public.activities (user_id, activity_date desc);
 create index if not exists activities_date_idx on public.activities (activity_date desc);
+
+-- ฐานข้อมูลเดิม (สร้างก่อนการแก้ไข): เติม default ให้ user_id เพื่อไม่ให้ client เป็นผู้กำหนดเจ้าของรายการ
+alter table public.activities alter column user_id set default auth.uid();
 
 -- 4) ตาราง attachments (ไฟล์แนบ — ไฟล์จริงเก็บใน Storage bucket "attachments")
 create table if not exists public.attachments (
@@ -63,6 +66,21 @@ as $$
   select exists (
     select 1 from public.profiles
     where id = auth.uid() and role = 'admin' and is_active
+  );
+$$;
+
+-- บัญชีที่ยัง active เท่านั้นที่ใช้สิทธิ์เจ้าของรายการได้ (ใช้คู่กับ user_id = auth.uid()
+-- เพื่อให้การปิดใช้งานบัญชีมีผลต่อ data plane ด้วย)
+create or replace function public.is_active_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and is_active
   );
 $$;
 
@@ -138,20 +156,20 @@ create policy "categories_delete" on public.categories
 -- activities: แต่ละคนจัดการของตัวเอง, แอดมินจัดการได้ทุกรายการ
 drop policy if exists "activities_select" on public.activities;
 create policy "activities_select" on public.activities
-  for select using (user_id = auth.uid() or public.is_admin());
+  for select using ((user_id = auth.uid() and public.is_active_user()) or public.is_admin());
 
 drop policy if exists "activities_insert" on public.activities;
 create policy "activities_insert" on public.activities
-  for insert with check (user_id = auth.uid() or public.is_admin());
+  for insert with check ((user_id = auth.uid() and public.is_active_user()) or public.is_admin());
 
 drop policy if exists "activities_update" on public.activities;
 create policy "activities_update" on public.activities
-  for update using (user_id = auth.uid() or public.is_admin())
-  with check (user_id = auth.uid() or public.is_admin());
+  for update using ((user_id = auth.uid() and public.is_active_user()) or public.is_admin())
+  with check ((user_id = auth.uid() and public.is_active_user()) or public.is_admin());
 
 drop policy if exists "activities_delete" on public.activities;
 create policy "activities_delete" on public.activities
-  for delete using (user_id = auth.uid() or public.is_admin());
+  for delete using ((user_id = auth.uid() and public.is_active_user()) or public.is_admin());
 
 -- attachments: ตามสิทธิ์ของ activity ที่ไฟล์แนบอยู่
 drop policy if exists "attachments_select" on public.attachments;
@@ -159,7 +177,8 @@ create policy "attachments_select" on public.attachments
   for select using (
     exists (
       select 1 from public.activities a
-      where a.id = activity_id and (a.user_id = auth.uid() or public.is_admin())
+      where a.id = activity_id
+        and ((a.user_id = auth.uid() and public.is_active_user()) or public.is_admin())
     )
   );
 
@@ -168,7 +187,8 @@ create policy "attachments_insert" on public.attachments
   for insert with check (
     exists (
       select 1 from public.activities a
-      where a.id = activity_id and (a.user_id = auth.uid() or public.is_admin())
+      where a.id = activity_id
+        and ((a.user_id = auth.uid() and public.is_active_user()) or public.is_admin())
     )
   );
 
@@ -177,7 +197,8 @@ create policy "attachments_delete" on public.attachments
   for delete using (
     exists (
       select 1 from public.activities a
-      where a.id = activity_id and (a.user_id = auth.uid() or public.is_admin())
+      where a.id = activity_id
+        and ((a.user_id = auth.uid() and public.is_active_user()) or public.is_admin())
     )
   );
 
@@ -193,21 +214,21 @@ drop policy if exists "attachments_storage_select" on storage.objects;
 create policy "attachments_storage_select" on storage.objects
   for select using (
     bucket_id = 'attachments'
-    and (public.is_admin() or (storage.foldername(name))[1] = auth.uid()::text)
+    and (public.is_admin() or ((storage.foldername(name))[1] = auth.uid()::text and public.is_active_user()))
   );
 
 drop policy if exists "attachments_storage_insert" on storage.objects;
 create policy "attachments_storage_insert" on storage.objects
   for insert with check (
     bucket_id = 'attachments'
-    and (public.is_admin() or (storage.foldername(name))[1] = auth.uid()::text)
+    and (public.is_admin() or ((storage.foldername(name))[1] = auth.uid()::text and public.is_active_user()))
   );
 
 drop policy if exists "attachments_storage_delete" on storage.objects;
 create policy "attachments_storage_delete" on storage.objects
   for delete using (
     bucket_id = 'attachments'
-    and (public.is_admin() or (storage.foldername(name))[1] = auth.uid()::text)
+    and (public.is_admin() or ((storage.foldername(name))[1] = auth.uid()::text and public.is_active_user()))
   );
 
 -- ============================================================

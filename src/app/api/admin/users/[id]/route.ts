@@ -8,15 +8,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const caller = await getProfile();
-  if (!caller || caller.role !== "admin") {
+  if (!caller || caller.role !== "admin" || !caller.is_active) {
     return NextResponse.json({ error: "ไม่มีสิทธิ์เข้าถึง" }, { status: 403 });
   }
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
 
+  // normalize ก่อนเช็ค เพื่อให้ guard กับค่าที่เขียนจริงเห็น boolean เดียวกัน
+  const wantsDeactivate = body?.is_active !== undefined && !Boolean(body.is_active);
+
   // กันแอดมินล็อกตัวเองออกจากระบบ
-  if (id === caller.id && (body?.role !== undefined || body?.is_active === false)) {
+  if (id === caller.id && (body?.role !== undefined || wantsDeactivate)) {
     return NextResponse.json(
       { error: "ไม่สามารถเปลี่ยนสิทธิ์หรือปิดใช้งานบัญชีของตัวเองได้" },
       { status: 400 },
@@ -55,6 +58,17 @@ export async function PATCH(
       .eq("id", id);
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 400 });
+    }
+
+    // การ (ปิด/เปิด) ใช้งานต้องบังคับใช้จริงที่ตัวตนผู้ใช้: ban = เพิกถอน session ทั้งหมด
+    // และห้าม login ใหม่, unban = กลับมาใช้ได้ตามปกติ
+    if (profileUpdates.is_active !== undefined) {
+      const { error: banError } = await adminClient.auth.admin.updateUserById(id, {
+        ban_duration: profileUpdates.is_active ? "none" : "876000h",
+      });
+      if (banError) {
+        return NextResponse.json({ error: banError.message }, { status: 400 });
+      }
     }
   }
 
