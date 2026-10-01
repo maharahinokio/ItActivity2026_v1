@@ -7,3 +7,15 @@
 body {
   font-family: var(--font-sans);
 }
+
+/* iOS Safari กำหนดความกว้างขั้นต่ำของช่องวันที่/เวลาไว้ในตัว ทำให้ล้นกรอบเมื่อคอลัมน์แคบ */
+input[type="date"],
+input[type="time"] {
+  min-width: 0;
+}
+
+/* ปิดบล็อกสีตอนแตะลิงก์/ปุ่มบนมือถือ (iOS แสดงค้างจนดูเหมือนเมนู active) */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}

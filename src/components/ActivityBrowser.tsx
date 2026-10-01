@@ -109,7 +109,7 @@ export function ActivityBrowser({
 
       {/* ตัวกรอง */}
       <div className="grid grid-cols-2 gap-3 rounded-xl bg-white p-4 shadow sm:grid-cols-3 lg:grid-cols-5">
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs font-medium text-slate-500">
             จากวันที่
           </label>
@@ -117,10 +117,10 @@ export function ActivityBrowser({
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm"
+            className="w-full min-w-0 rounded-lg border border-slate-300 px-2.5 py-2 text-sm"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs font-medium text-slate-500">
             ถึงวันที่
           </label>
@@ -128,10 +128,10 @@ export function ActivityBrowser({
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm"
+            className="w-full min-w-0 rounded-lg border border-slate-300 px-2.5 py-2 text-sm"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs font-medium text-slate-500">
             หมวดงาน
           </label>
@@ -148,7 +148,7 @@ export function ActivityBrowser({
             ))}
           </select>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs font-medium text-slate-500">
             ช่วงเวลา
           </label>
@@ -163,7 +163,7 @@ export function ActivityBrowser({
           </select>
         </div>
         {isAdmin ? (
-          <div>
+          <div className="min-w-0">
             <label className="mb-1 block text-xs font-medium text-slate-500">
               เจ้าหน้าที่
             </label>

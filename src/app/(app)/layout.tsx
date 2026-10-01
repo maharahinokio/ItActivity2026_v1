@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NavBar, MobileNav } from "@/components/NavBar";
 
 export default async function AppLayout({
   children,
@@ -20,27 +21,18 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 bg-blue-700 text-white shadow-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          {/* มือถือ: ปุ่ม hamburger ซ้ายสุด */}
+          <MobileNav items={nav} />
+
           <Link href="/" className="flex items-center gap-2 text-lg font-bold">
             <span>🖥️</span>
             <span className="hidden sm:inline">บันทึกกิจกรรมไอที</span>
             <span className="sm:hidden">IT Activity</span>
           </Link>
 
-          <nav className="order-3 -mx-4 w-full overflow-x-auto sm:order-none sm:mx-0 sm:w-auto">
-            <ul className="flex gap-1 px-4 text-sm sm:px-0">
-              {nav.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="block whitespace-nowrap rounded-lg px-3 py-1.5 transition hover:bg-blue-600"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {/* จอใหญ่: เมนูแนวนอนข้างโลโก้ */}
+          <NavBar items={nav} />
 
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="hidden text-blue-100 md:inline">
