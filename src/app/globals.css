@@ -14,6 +14,21 @@ input[type="time"] {
   min-width: 0;
 }
 
+/* iOS: strip native appearance ของ date/time input — ไม่งั้น iOS บังคับความกว้าง
+   ของค่าวันที่/เป้า picker ให้ล้นช่องเสมอ แม้ตั้ง min-width:0 แล้ว */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    min-height: 1.5em;
+    text-align: left;
+  }
+}
+
 /* ปิดบล็อกสีตอนแตะลิงก์/ปุ่มบนมือถือ (iOS แสดงค้างจนดูเหมือนเมนู active) */
 a,
 button {
