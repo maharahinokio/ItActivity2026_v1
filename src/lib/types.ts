@@ -18,6 +18,19 @@ export interface Category {
   created_at: string;
 }
 
+export type HolidayKind = "yearly" | "once";
+
+export interface Holiday {
+  id: string;
+  name: string;
+  kind: HolidayKind;
+  /** วันหยุดกำหนดวันเดียว (YYYY-MM-DD) — ใช้เมื่อ kind = "once" */
+  date: string | null;
+  /** วันหยุดทุกปี (MM-DD) — ใช้เมื่อ kind = "yearly" */
+  month_day: string | null;
+  created_at: string;
+}
+
 export interface Activity {
   id: string;
   user_id: string;

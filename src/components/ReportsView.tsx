@@ -265,18 +265,7 @@ export function ReportsView({ isAdmin, currentUserId, staff }: Props) {
                   ไม่มีข้อมูลในช่วงวันที่ที่เลือก
                 </p>
               ) : (
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-slate-100">
-                    {stats.categories.map(([name, minutes]) => (
-                      <tr key={name}>
-                        <td className="py-2">{name}</td>
-                        <td className="py-2 text-right text-slate-500">
-                          {formatDuration(minutes)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ProportionChart data={stats.categories} />
               )}
             </section>
 
@@ -287,23 +276,79 @@ export function ReportsView({ isAdmin, currentUserId, staff }: Props) {
                   ไม่มีข้อมูลในช่วงวันที่ที่เลือก
                 </p>
               ) : (
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-slate-100">
-                    {stats.users.map(([name, minutes]) => (
-                      <tr key={name}>
-                        <td className="py-2">{name}</td>
-                        <td className="py-2 text-right text-slate-500">
-                          {formatDuration(minutes)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ProportionChart data={stats.users} />
               )}
             </section>
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/** สีของแท่งกราฟ — ต้องเป็นชื่อ class คงที่เพื่อให้ Tailwind สร้าง CSS ครบ */
+const BAR_COLORS = [
+  "bg-blue-500",
+  "bg-indigo-500",
+  "bg-green-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-teal-500",
+  "bg-purple-500",
+  "bg-slate-400",
+];
+
+/** กราฟแท่งแนวนอนแสดงสัดส่วน: แท่งรวมด้านบน + รายแถวพร้อมเวลาและเปอร์เซ็นต์ */
+function ProportionChart({ data }: { data: [string, number][] }) {
+  const total = data.reduce((sum, [, minutes]) => sum + minutes, 0) || 1;
+
+  return (
+    <div>
+      {/* แท่งสรุปสัดส่วนรวมทุกรายการ */}
+      <div
+        role="img"
+        aria-label="แท่งสรุปสัดส่วนรวม"
+        className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100"
+      >
+        {data.map(([name, minutes], i) => (
+          <div
+            key={name}
+            className={BAR_COLORS[i % BAR_COLORS.length]}
+            style={{ width: `${(minutes / total) * 100}%` }}
+            title={`${name} ${Math.round((minutes / total) * 100)}%`}
+          />
+        ))}
+      </div>
+
+      <ul className="mt-5 space-y-4">
+        {data.map(([name, minutes], i) => {
+          const pct = Math.round((minutes / total) * 100);
+          return (
+            <li key={name}>
+              <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                      BAR_COLORS[i % BAR_COLORS.length]
+                    }`}
+                    aria-hidden
+                  />
+                  <span className="truncate">{name}</span>
+                </span>
+                <span className="shrink-0 text-slate-500">
+                  {formatDuration(minutes)} · {pct}%
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100">
+                <div
+                  className={`h-2 rounded-full ${BAR_COLORS[i % BAR_COLORS.length]}`}
+                  style={{ width: `${Math.max(2, pct)}%` }}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

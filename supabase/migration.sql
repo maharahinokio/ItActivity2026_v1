@@ -39,6 +39,27 @@ create table if not exists public.activities (
 create index if not exists activities_user_date_idx on public.activities (user_id, activity_date desc);
 create index if not exists activities_date_idx on public.activities (activity_date desc);
 
+create index if not exists categories_sort_idx on public.categories (sort_order);
+
+-- 2b) ตาราง holidays (ปฏิทินวันหยุด — admin จัดการเอง)
+--     kind='yearly' → วันหยุดที่เกิดทุกปี เก็บ month_day รูปแบบ 'MM-DD'
+--     kind='once'   → วันหยุดกำหนดวันเดียว เก็บ date (YYYY-MM-DD)
+create table if not exists public.holidays (
+  id uuid primary key default gen_random_uuid(),
+  name text not null default '',
+  kind text not null check (kind in ('yearly', 'once')),
+  date date,
+  month_day text,
+  created_at timestamptz not null default now(),
+  constraint holidays_shape_check check (
+    (kind = 'once' and date is not null and month_day is null)
+    or (kind = 'yearly' and month_day is not null and date is null)
+  )
+);
+
+create index if not exists holidays_date_idx on public.holidays (date);
+create index if not exists holidays_month_day_idx on public.holidays (month_day);
+
 -- ฐานข้อมูลเดิม (สร้างก่อนการแก้ไข): เติม default ให้ user_id เพื่อไม่ให้ client เป็นผู้กำหนดเจ้าของรายการ
 alter table public.activities alter column user_id set default auth.uid();
 
@@ -128,6 +149,7 @@ create trigger activities_touch_updated_at
 -- ============================================================
 alter table public.profiles enable row level security;
 alter table public.categories enable row level security;
+alter table public.holidays enable row level security;
 alter table public.activities enable row level security;
 alter table public.attachments enable row level security;
 
@@ -135,6 +157,12 @@ alter table public.attachments enable row level security;
 drop policy if exists "profiles_select" on public.profiles;
 create policy "profiles_select" on public.profiles
   for select using (id = auth.uid() or public.is_admin());
+
+-- เคลียร์ของที่เคยเพิ่มสำหรับฟีเจอร์ "แก้โปรไฟล์เอง" (ยกเลิกแล้ว): กลับสู่สิทธิ์ปกติ
+-- (รันแล้วไม่มีผลอะไรถ้าไม่เคยสร้าง, ถ้าเคยรันเวอร์ชันเก่าจะทำให้ DB กลับสู่ค่าเริ่มต้น)
+drop policy if exists "profiles_self_update" on public.profiles;
+drop trigger if exists on_auth_user_updated on auth.users;
+grant update on table public.profiles to authenticated;
 
 -- categories: ทุกคนที่ล็อกอินอ่านได้, แอดมินเท่านั้นที่เขียนได้
 drop policy if exists "categories_select" on public.categories;
@@ -151,6 +179,23 @@ create policy "categories_update" on public.categories
 
 drop policy if exists "categories_delete" on public.categories;
 create policy "categories_delete" on public.categories
+  for delete using (public.is_admin());
+
+-- holidays: ทุกคนที่ล็อกอินอ่านได้ (ใช้คำนวณ auto period), แอดมินเท่านั้นที่จัดการ
+drop policy if exists "holidays_select" on public.holidays;
+create policy "holidays_select" on public.holidays
+  for select using (auth.role() = 'authenticated');
+
+drop policy if exists "holidays_insert" on public.holidays;
+create policy "holidays_insert" on public.holidays
+  for insert with check (public.is_admin());
+
+drop policy if exists "holidays_update" on public.holidays;
+create policy "holidays_update" on public.holidays
+  for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "holidays_delete" on public.holidays;
+create policy "holidays_delete" on public.holidays
   for delete using (public.is_admin());
 
 -- activities: แต่ละคนจัดการของตัวเอง, แอดมินจัดการได้ทุกรายการ

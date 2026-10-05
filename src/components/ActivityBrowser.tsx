@@ -36,6 +36,10 @@ export function ActivityBrowser({
   const [items, setItems] = useState<ActivityJoined[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // ไฟล์แนบของรายการที่โหลด — ใช้แสดงตรา 📎 และเปิดดูไฟล์
+  const [attachMap, setAttachMap] = useState<
+    Record<string, { file_name: string; mime_type: string }[]>
+  >({});
 
   const fetchActivities = useCallback(async () => {
     setLoading(true);
@@ -56,7 +60,27 @@ export function ActivityBrowser({
 
     const { data, error: fetchError } = await query;
     if (fetchError) setError(fetchError.message);
-    setItems((data ?? []) as unknown as ActivityJoined[]);
+    const rows = (data ?? []) as unknown as ActivityJoined[];
+    setItems(rows);
+
+    // ดึงไฟล์แนบของรายการทั้งหมดเพื่อแสดงตรา 📎
+    const ids = rows.map((a) => a.id);
+    if (ids.length > 0) {
+      const { data: atts } = await supabase
+        .from("attachments")
+        .select("activity_id, file_name, mime_type")
+        .in("activity_id", ids);
+      const map: Record<string, { file_name: string; mime_type: string }[]> = {};
+      for (const at of atts ?? []) {
+        (map[at.activity_id] ??= []).push({
+          file_name: at.file_name,
+          mime_type: at.mime_type,
+        });
+      }
+      setAttachMap(map);
+    } else {
+      setAttachMap({});
+    }
     setLoading(false);
   }, [selectedUser, from, to, categoryId, period]);
 
@@ -94,6 +118,38 @@ export function ActivityBrowser({
     (sum, a) => sum + Math.max(0, durationMinutes(a.start_time, a.end_time)),
     0,
   );
+
+  /** เปิดดูไฟล์แนบแรกของรายการ (signed URL 1 ชม.) */
+  async function openFirstAttachment(activityId: string) {
+    const supabase = createClient();
+    const { data: att } = await supabase
+      .from("attachments")
+      .select("storage_path")
+      .eq("activity_id", activityId)
+      .limit(1)
+      .single();
+    if (!att) return;
+    const { data } = await supabase.storage
+      .from("attachments")
+      .createSignedUrl(att.storage_path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
+  }
+
+  /** ตรา 📎 แสดงว่ารายการนี้มีไฟล์แนบ (กดเพื่อเปิดดูไฟล์แรก) */
+  function attachmentBadge(activityId: string) {
+    const files = attachMap[activityId];
+    if (!files || files.length === 0) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => openFirstAttachment(activityId)}
+        title={`ไฟล์แนบ (${files.length}): ${files.map((f) => f.file_name).join(", ")}`}
+        className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+      >
+        📎 {files.length}
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -260,8 +316,11 @@ export function ActivityBrowser({
                     )}
                     <td className="px-4 py-3">{a.categories?.name ?? "-"}</td>
                     <td className="max-w-xs px-4 py-3">
-                      <p className="truncate" title={a.description}>
-                        {a.description}
+                      <p className="flex items-center gap-2">
+                        <span className="truncate" title={a.description}>
+                          {a.description}
+                        </span>
+                        {attachmentBadge(a.id)}
                       </p>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -309,6 +368,7 @@ export function ActivityBrowser({
                   >
                     {PERIOD_LABEL[a.period]}
                   </span>
+                  {attachmentBadge(a.id)}
                 </div>
                 <p className="text-sm">{a.description}</p>
                 <div className="mt-2 flex items-center justify-between text-xs text-slate-400">

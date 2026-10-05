@@ -15,10 +15,39 @@ export function toMinutes(time: string): number {
   return Number(h) * 60 + Number(m);
 }
 
-/** คำนวณช่วงเวลา (ใน/นอกเวลาทำการ) จากเวลาเริ่ม-สิ้นสุด */
-export function computePeriod(startTime: string, endTime: string): Period {
-  return toMinutes(startTime) >= toMinutes(WORK_START) &&
-    toMinutes(endTime) <= toMinutes(WORK_END)
+/** รวมวันหยุดสำหรับคำนวณช่วงเวลา (มาจากตาราง holidays) */
+export interface HolidayMap {
+  /** วันหยุดกำหนดวันเดียว (YYYY-MM-DD) */
+  specificDates: Set<string>;
+  /** วันหยุดที่เกิดทุกปี (MM-DD) */
+  yearlyDates: Set<string>;
+}
+
+/** วันนี้เป็นวันไม่ทำการหรือไม่ (เสาร์/อาทิตย์ หรือตรงกับวันหยุดตามปฏิทิน) */
+export function isNonWorkingDay(date: string, holidays?: HolidayMap): boolean {
+  const d = new Date(date + "T00:00:00");
+  if (isNaN(d.getTime())) return false;
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  if (!holidays) return false;
+  return holidays.specificDates.has(date) || holidays.yearlyDates.has(date.slice(5));
+}
+
+/**
+ * คำนวณช่วงเวลา (ใน/นอกเวลาทำการ) จากวันที่ + เวลาเริ่ม-สิ้นสุด
+ * - เสาร์/อาทิตย์ หรือวันหยุดตามปฏิทิน → นอกเวลาทำการ
+ * - วันทำการ: ดูที่ "เวลาเริ่มต้น" เป็นตัวตั้ง — เริ่มในช่วง 08:30–16:30 นับเป็นในเวลา
+ *   ทั้งรายการแม้สิ้นสุดเลยเขต (งานที่คร่อมเขตเวลานับตามต้น)
+ */
+export function computePeriod(
+  date: string,
+  startTime: string,
+  endTime: string,
+  holidays?: HolidayMap,
+): Period {
+  if (isNonWorkingDay(date, holidays)) return "out_of_hours";
+  const start = toMinutes(startTime);
+  return start >= toMinutes(WORK_START) && start <= toMinutes(WORK_END)
     ? "in_hours"
     : "out_of_hours";
 }
@@ -56,6 +85,15 @@ export function formatThaiDate(isoDate: string): string {
   return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
 
+/** แปลง "MM-DD" เป็น "13 เม.ย." (สำหรับวันหยุดที่เกิดทุกปี) */
+export function formatThaiMonthDay(monthDay: string): string {
+  const [m = "0", d = "0"] = monthDay.split("-");
+  const month = Number(m);
+  const day = Number(d);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return monthDay;
+  return `${day} ${THAI_MONTHS_SHORT[month - 1]}`;
+}
+
 /** วันนี้ในรูปแบบ YYYY-MM-DD (ตามเวลาท้องถิ่น) */
 export function todayISO(): string {
   const d = new Date();
@@ -76,4 +114,20 @@ export function formatFileSize(bytes: number | null): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * แปลงชื่อไฟล์เป็นชื่อที่ Supabase Storage ยอมรับ (ASCII เท่านั้น)
+ * — Storage ปฏิเสธ key ที่มีอักขระไทย ("Invalid key") ดังนั้นเก็บไฟล์จริงด้วย
+ * ชื่อ ASCII ส่วนชื่อไทยเดิมเก็บแยกในคอลัมน์ attachments.file_name เพื่อแสดงผล
+ */
+export function safeStorageName(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot > 0 ? fileName.slice(dot).toLowerCase() : "";
+  const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const ascii = base
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `${Date.now()}-${ascii || "file"}${ext}`;
 }

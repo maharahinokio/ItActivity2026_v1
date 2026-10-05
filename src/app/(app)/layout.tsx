@@ -16,6 +16,7 @@ export default async function AppLayout({
     { href: "/reports", label: "รายงาน", show: true },
     { href: "/admin/staff", label: "จัดการเจ้าหน้าที่", show: profile.role === "admin" },
     { href: "/admin/categories", label: "จัดการหมวดงาน", show: profile.role === "admin" },
+    { href: "/admin/holidays", label: "จัดการวันหยุด", show: profile.role === "admin" },
   ].filter((item) => item.show);
 
   return (
@@ -34,15 +35,22 @@ export default async function AppLayout({
           {/* จอใหญ่: เมนูแนวนอนข้างโลโก้ */}
           <NavBar items={nav} />
 
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="hidden text-blue-100 md:inline">
-              {profile.full_name}
+          <div className="ml-auto flex min-w-0 items-center gap-3 text-sm">
+            {/* คลิกชื่อเพื่อไปหน้าเปลี่ยนรหัสผ่าน */}
+            <Link
+              href="/profile"
+              title="เปลี่ยนรหัสผ่าน"
+              className="flex min-w-0 items-center gap-1.5 text-blue-100 transition hover:text-white"
+            >
+              <span className="max-w-24 truncate md:max-w-none">
+                {profile.full_name}
+              </span>
               {profile.role === "admin" && (
-                <span className="ml-1.5 rounded bg-amber-400 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+                <span className="shrink-0 rounded bg-amber-400 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
                   แอดมิน
                 </span>
               )}
-            </span>
+            </Link>
             <LogoutButton />
           </div>
         </div>

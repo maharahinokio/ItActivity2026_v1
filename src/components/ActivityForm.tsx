@@ -11,6 +11,8 @@ import {
   durationMinutes,
   formatDuration,
   formatFileSize,
+  safeStorageName,
+  type HolidayMap,
 } from "@/lib/utils";
 
 interface Props {
@@ -50,6 +52,34 @@ export function ActivityForm({ categories, userId, activity }: Props) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ปฏิทินวันหยุด (admin จัดการ) — ใช้คำนวณ auto period
+  const [holidays, setHolidays] = useState<HolidayMap | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("holidays")
+        .select("kind, date, month_day");
+      if (cancelled) return;
+      const map: HolidayMap = {
+        specificDates: new Set(
+          (data ?? []).filter((h) => h.kind === "once" && h.date).map((h) => h.date as string),
+        ),
+        yearlyDates: new Set(
+          (data ?? [])
+            .filter((h) => h.kind === "yearly" && h.month_day)
+            .map((h) => h.month_day as string),
+        ),
+      };
+      setHolidays(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const activeExisting = existingAttachments.filter(
     (a) => !removedIds.has(a.id),
   );
@@ -80,8 +110,8 @@ export function ActivityForm({ categories, userId, activity }: Props) {
 
   const computedPeriod = useMemo(() => {
     if (!startTime || !endTime) return null;
-    return computePeriod(startTime, endTime);
-  }, [startTime, endTime]);
+    return computePeriod(activityDate, startTime, endTime, holidays);
+  }, [activityDate, startTime, endTime, holidays]);
 
   const effectivePeriod: Period | null =
     periodChoice === "auto" ? computedPeriod : periodChoice;
@@ -117,6 +147,20 @@ export function ActivityForm({ categories, userId, activity }: Props) {
       if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
       return copy;
     });
+  }
+
+  /** เปิดดูไฟล์แนบเดิมในแท็บใหม่ (สร้าง signed URL ชั่วคราว 1 ชม.) */
+  async function openAttachment(att: Attachment) {
+    const supabase = createClient();
+    let url: string | undefined = signedUrls[att.id];
+    if (!url) {
+      const { data } = await supabase.storage
+        .from("attachments")
+        .createSignedUrl(att.storage_path, 3600);
+      url = data?.signedUrl;
+      if (url) setSignedUrls((prev) => ({ ...prev, [att.id]: url as string }));
+    }
+    if (url) window.open(url, "_blank", "noopener");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -179,10 +223,10 @@ export function ActivityForm({ categories, userId, activity }: Props) {
           .in("id", [...removedIds]);
       }
 
-      // อัปโหลดไฟล์ใหม่
+      // อัปโหลดไฟล์ใหม่ — เก็บด้วยชื่อ ASCII (Storage ปฏิเสธอักขระไทย)
+      // ชื่อไฟล์เดิม (รวมภาษาไทย) เก็บในคอลัมน์ file_name เพื่อแสดงผล
       for (const item of newFiles) {
-        const safeName = item.file.name.replace(/[^\w.\-\u0E00-\u0E7F]+/g, "_");
-        const path = `${userId}/${activityId}/${Date.now()}-${safeName}`;
+        const path = `${userId}/${activityId}/${safeStorageName(item.file.name)}`;
         const { error: uploadError } = await supabase.storage
           .from("attachments")
           .upload(path, item.file);
@@ -392,6 +436,14 @@ export function ActivityForm({ categories, userId, activity }: Props) {
                     </span>
                   </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => openAttachment(att)}
+                  title="เปิดดูไฟล์"
+                  className="absolute bottom-1 left-1 rounded-md bg-slate-900/70 px-2 py-0.5 text-xs text-white transition hover:bg-slate-900"
+                >
+                  เปิดดู
+                </button>
                 <button
                   type="button"
                   onClick={() =>
