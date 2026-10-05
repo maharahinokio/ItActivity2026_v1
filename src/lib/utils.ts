@@ -108,6 +108,29 @@ export function monthStartISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
+/**
+ * เปิด URL ในแท็บใหม่แบบไม่โดน popup blocker:
+ * เปิดแท็บเปล่าทันทีใน user gesture (ซิงก์) แล้วค่อยชี้ไปที่ URL ที่ได้มาหลัง await —
+ * ถ้าเรียก window.open หลัง await เบราว์เซอร์จะบล็อกเงียบ ๆ ทำให้ "กดแล้วไม่มีอะไรเกิดขึ้น"
+ * ถ้าเปิดแท็บใหม่ไม่ได้เลย (บล็อกหมด) จะ fallback เปิดในแท็บเดิม
+ */
+export async function openUrlInNewTab(
+  getUrl: () => Promise<string | null | undefined>,
+): Promise<void> {
+  const win = typeof window !== "undefined" ? window.open("", "_blank") : null;
+  const url = await getUrl();
+  if (win) {
+    if (url) {
+      win.opener = null;
+      win.location.href = url;
+    } else {
+      win.close();
+    }
+  } else if (url && typeof window !== "undefined") {
+    window.location.href = url;
+  }
+}
+
 /** ขนาดไฟล์ที่อ่านง่าย */
 export function formatFileSize(bytes: number | null): string {
   if (!bytes) return "";

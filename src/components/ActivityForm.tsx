@@ -11,6 +11,7 @@ import {
   durationMinutes,
   formatDuration,
   formatFileSize,
+  openUrlInNewTab,
   safeStorageName,
   type HolidayMap,
 } from "@/lib/utils";
@@ -151,16 +152,18 @@ export function ActivityForm({ categories, userId, activity }: Props) {
 
   /** เปิดดูไฟล์แนบเดิมในแท็บใหม่ (สร้าง signed URL ชั่วคราว 1 ชม.) */
   async function openAttachment(att: Attachment) {
-    const supabase = createClient();
-    let url: string | undefined = signedUrls[att.id];
-    if (!url) {
-      const { data } = await supabase.storage
-        .from("attachments")
-        .createSignedUrl(att.storage_path, 3600);
-      url = data?.signedUrl;
-      if (url) setSignedUrls((prev) => ({ ...prev, [att.id]: url as string }));
-    }
-    if (url) window.open(url, "_blank", "noopener");
+    await openUrlInNewTab(async () => {
+      const supabase = createClient();
+      let url: string | undefined = signedUrls[att.id];
+      if (!url) {
+        const { data } = await supabase.storage
+          .from("attachments")
+          .createSignedUrl(att.storage_path, 3600);
+        url = data?.signedUrl;
+        if (url) setSignedUrls((prev) => ({ ...prev, [att.id]: url as string }));
+      }
+      return url;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {

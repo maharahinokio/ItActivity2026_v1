@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatThaiDate,
   monthStartISO,
+  openUrlInNewTab,
   shortTime,
   todayISO,
 } from "@/lib/utils";
@@ -121,18 +122,20 @@ export function ActivityBrowser({
 
   /** เปิดดูไฟล์แนบแรกของรายการ (signed URL 1 ชม.) */
   async function openFirstAttachment(activityId: string) {
-    const supabase = createClient();
-    const { data: att } = await supabase
-      .from("attachments")
-      .select("storage_path")
-      .eq("activity_id", activityId)
-      .limit(1)
-      .single();
-    if (!att) return;
-    const { data } = await supabase.storage
-      .from("attachments")
-      .createSignedUrl(att.storage_path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
+    await openUrlInNewTab(async () => {
+      const supabase = createClient();
+      const { data: att } = await supabase
+        .from("attachments")
+        .select("storage_path")
+        .eq("activity_id", activityId)
+        .limit(1)
+        .single();
+      if (!att) return null;
+      const { data } = await supabase.storage
+        .from("attachments")
+        .createSignedUrl(att.storage_path, 3600);
+      return data?.signedUrl ?? null;
+    });
   }
 
   /** ตรา 📎 แสดงว่ารายการนี้มีไฟล์แนบ (กดเพื่อเปิดดูไฟล์แรก) */
